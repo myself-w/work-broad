@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2024年度工作内容布置与追踪</title>
+    <title>2026年度工作内容布置与追踪</title>
     <style>
-        /* 样式保持不变 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; min-height: 100vh; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; }
@@ -51,9 +50,9 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📅 2024年度工作布置与追踪</h1>
+            <h1>📅 2026年度工作布置与追踪</h1>
             <p>所有人共同编辑，数据实时云端同步 | 点击月份卡片即可查看或修改</p>
-            <div class="sync-status status-offline" id="syncStatus">🔴 正在连接 Supabase 数据库...</div>
+            <div class="sync-status status-offline" id="syncStatus">🔴 正在连接数据库...</div>
         </div>
         <div class="grid" id="monthsGrid"></div>
     </div>
@@ -74,14 +73,12 @@
 
     <div class="toast" id="toast"></div>
 
-    <!-- 引入 Supabase 官方 SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // ⚠️ 核心配置：请替换为你在 Supabase Settings -> API 中获取的真实值！
+        // ⚠️ 填入你的真实配置
         const SUPABASE_URL = 'https://dtfbivrlbtveuocqomzq.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0ZmJpdnJsYnR2ZXVvY3FvbXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMDMyNzMsImV4cCI6MjA5NzY3OTI3M30.Cp0DP1r5_kar5QQgsSsPJ9WlBcvSG5dm_uFgcDPqBjs'; 
 
-        // 初始化 Supabase 客户端
         const { createClient } = supabase;
         const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -90,42 +87,39 @@
         let saveTimer = null;
 
         async function init() {
-            await loadData();
-            renderGrid();
-            subscribeToChanges();
+            // 🌟 核心修改：无论数据库好坏，先强制把 12 个月份的卡片画出来！
+            renderGrid(); 
             
-            // 更新连接状态
-            const statusEl = document.getElementById('syncStatus');
-            statusEl.textContent = '🟢 实时同步已连接 (Supabase)';
-            statusEl.className = 'sync-status status-online';
+            try {
+                await loadData();
+                renderGrid(); // 数据加载成功后，带着数据再刷新一次
+                subscribeToChanges();
+                
+                const statusEl = document.getElementById('syncStatus');
+                statusEl.textContent = '🟢 实时同步已连接 (Supabase)';
+                statusEl.className = 'sync-status status-online';
+            } catch (error) {
+                console.error('初始化出错:', error);
+                showToast('❌ 数据库连接失败，请检查 F12 控制台');
+            }
         }
 
-        // 1. 从云端加载所有数据
         async function loadData() {
-            const { data, error } = await db.from('work_board_2024').select('*');
-            if (error) {
-                console.error('加载数据失败:', error);
-                showToast('❌ 数据加载失败，请检查配置');
-                return;
-            }
+            const { data, error } = await db.from('work_board').select('*');
+            if (error) throw error; // 抛出错误，让 init 捕获
             data.forEach(row => {
                 yearData[row.month] = row.content || '';
             });
         }
 
-        // 2. 监听云端数据变化（别人修改时，你的界面会自动更新）
         function subscribeToChanges() {
             db.channel('work_board_changes')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'work_board_2024' }, payload => {
                     const newMonth = payload.new.month;
                     const newContent = payload.new.content || '';
-                    
-                    // 只有当数据真正发生变化时才更新 UI
                     if (yearData[newMonth] !== newContent) {
                         yearData[newMonth] = newContent;
                         renderGrid(); 
-                        
-                        // 优化：防止别人同步数据时，导致你正在打字的光标乱跳
                         if (currentEditMonth === newMonth) {
                             const textarea = document.getElementById('modalContent');
                             if (document.activeElement !== textarea && textarea.value !== newContent) {
@@ -183,7 +177,6 @@
             currentEditMonth = null;
         }
 
-        // 保存数据到云端 (使用 upsert，存在则更新，不存在则插入)
         async function saveToCloud(month, content) {
             const { error } = await db.from('work_board_2024').upsert({ 
                 month: month, 
@@ -201,7 +194,6 @@
             closeModal();
         }
 
-        // 优化：加入防抖 (Debounce)，停止打字 0.8 秒后才同步，避免频繁请求
         document.getElementById('modalContent').addEventListener('input', function() {
             if (currentEditMonth === null) return;
             clearTimeout(saveTimer);
@@ -229,7 +221,6 @@
             if (e.target === this) closeModal();
         });
 
-        // 启动
         init();
     </script>
 </body>
