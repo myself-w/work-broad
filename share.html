@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024年度工作内容布置与追踪</title>
+    <style>
+        /* 样式保持不变 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2.2rem; color: #1f2937; margin-bottom: 8px; }
+        .header p { color: #6b7280; font-size: 0.95rem; }
+        .sync-status { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+        .status-online { background: #d1fae5; color: #065f46; }
+        .status-offline { background: #fee2e2; color: #991b1b; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .month-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent; display: flex; flex-direction: column; min-height: 180px; }
+        .month-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-color: #3b82f6; }
+        .month-card.has-content { border-left: 5px solid #10b981; }
+        .month-card.current-month { background: linear-gradient(135deg, #eff6ff, #ffffff); border-color: #3b82f6; }
+        .month-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .month-title { font-size: 1.4rem; font-weight: 700; color: #111827; }
+        .month-badge { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+        .badge-done { background: #d1fae5; color: #065f46; }
+        .badge-empty { background: #f3f4f6; color: #6b7280; }
+        .badge-current { background: #dbeafe; color: #1e40af; }
+        .month-content { flex: 1; font-size: 0.9rem; color: #4b5563; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+        .month-content.empty { color: #9ca3af; font-style: italic; }
+        .edit-hint { margin-top: 15px; font-size: 0.8rem; color: #9ca3af; text-align: right; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; border-radius: 20px; padding: 30px; width: 100%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+        .modal h3 { font-size: 1.5rem; color: #111827; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .modal textarea { flex: 1; width: 100%; min-height: 250px; border: 2px solid #e5e7eb; border-radius: 12px; padding: 16px; font-size: 1rem; resize: none; outline: none; font-family: inherit; line-height: 1.6; transition: border-color 0.3s; }
+        .modal textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+        .save-hint { font-size: 0.85rem; color: #10b981; font-weight: 500; opacity: 0; transition: opacity 0.3s; }
+        .save-hint.show { opacity: 1; }
+        .btn-group { display: flex; gap: 12px; }
+        .btn { padding: 10px 24px; border: none; border-radius: 10px; font-size: 0.95rem; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-save { background: #3b82f6; color: white; }
+        .btn-save:hover { background: #2563eb; }
+        .btn-cancel { background: #f3f4f6; color: #4b5563; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1f2937; color: white; padding: 12px 24px; border-radius: 10px; font-size: 0.9rem; transition: transform 0.3s ease; z-index: 2000; }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 2024年度工作布置与追踪</h1>
+            <p>所有人共同编辑，数据实时云端同步 | 点击月份卡片即可查看或修改</p>
+            <div class="sync-status status-offline" id="syncStatus">🔴 正在连接 Supabase 数据库...</div>
+        </div>
+        <div class="grid" id="monthsGrid"></div>
+    </div>
+
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3 id="modalTitle">📝 1月 工作内容</h3>
+            <textarea id="modalContent" placeholder="请输入本月的工作布置、目标或进展..."></textarea>
+            <div class="modal-footer">
+                <div class="save-hint" id="saveHint">✅ 已自动同步到云端</div>
+                <div class="btn-group">
+                    <button class="btn btn-cancel" onclick="closeModal()">关闭</button>
+                    <button class="btn btn-save" onclick="saveAndClose()">保存并关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- 引入 Supabase 官方 SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // ⚠️ 核心配置：请替换为你在 Supabase Settings -> API 中获取的真实值！
+        const SUPABASE_URL = 'https://dtfbivrlbtveuocqomzq.supabase.co/rest/v1/'; 
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0ZmJpdnJsYnR2ZXVvY3FvbXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMDMyNzMsImV4cCI6MjA5NzY3OTI3M30.Cp0DP1r5_kar5QQgsSsPJ9WlBcvSG5dm_uFgcDPqBjs'; 
+
+        // 初始化 Supabase 客户端
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentEditMonth = null;
+        let yearData = {};
+        let saveTimer = null;
+
+        async function init() {
+            await loadData();
+            renderGrid();
+            subscribeToChanges();
+            
+            // 更新连接状态
+            const statusEl = document.getElementById('syncStatus');
+            statusEl.textContent = '🟢 实时同步已连接 (Supabase)';
+            statusEl.className = 'sync-status status-online';
+        }
+
+        // 1. 从云端加载所有数据
+        async function loadData() {
+            const { data, error } = await db.from('work_board_2024').select('*');
+            if (error) {
+                console.error('加载数据失败:', error);
+                showToast('❌ 数据加载失败，请检查配置');
+                return;
+            }
+            data.forEach(row => {
+                yearData[row.month] = row.content || '';
+            });
+        }
+
+        // 2. 监听云端数据变化（别人修改时，你的界面会自动更新）
+        function subscribeToChanges() {
+            db.channel('work_board_changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'work_board_2024' }, payload => {
+                    const newMonth = payload.new.month;
+                    const newContent = payload.new.content || '';
+                    
+                    // 只有当数据真正发生变化时才更新 UI
+                    if (yearData[newMonth] !== newContent) {
+                        yearData[newMonth] = newContent;
+                        renderGrid(); 
+                        
+                        // 优化：防止别人同步数据时，导致你正在打字的光标乱跳
+                        if (currentEditMonth === newMonth) {
+                            const textarea = document.getElementById('modalContent');
+                            if (document.activeElement !== textarea && textarea.value !== newContent) {
+                                textarea.value = newContent;
+                            }
+                        }
+                    }
+                })
+                .subscribe();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('monthsGrid');
+            grid.innerHTML = '';
+            const currentMonth = new Date().getMonth() + 1;
+
+            for (let i = 1; i <= 12; i++) {
+                const content = yearData[i] || '';
+                const hasContent = content.trim().length > 0;
+                const isCurrent = i === currentMonth;
+
+                const card = document.createElement('div');
+                card.className = `month-card ${hasContent ? 'has-content' : ''} ${isCurrent ? 'current-month' : ''}`;
+                card.onclick = () => openModal(i);
+
+                let badge = '';
+                if (isCurrent) badge = '<span class="month-badge badge-current">本月</span>';
+                else if (hasContent) badge = '<span class="month-badge badge-done">已布置</span>';
+                else badge = '<span class="month-badge badge-empty">待完善</span>';
+
+                card.innerHTML = `
+                    <div class="month-header">
+                        <span class="month-title">${i}月</span>
+                        ${badge}
+                    </div>
+                    <div class="month-content ${!hasContent ? 'empty' : ''}">
+                        ${hasContent ? content.replace(/\n/g, '<br>') : '暂无内容，点击进行工作布置...'}
+                    </div>
+                    <div class="edit-hint">${hasContent ? '点击修改 ✏️' : '点击填写 ➕'}</div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        function openModal(month) {
+            currentEditMonth = month;
+            document.getElementById('modalTitle').textContent = `📝 ${month}月 工作内容`;
+            document.getElementById('modalContent').value = yearData[month] || '';
+            document.getElementById('editModal').classList.add('active');
+            document.getElementById('saveHint').classList.remove('show');
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('active');
+            currentEditMonth = null;
+        }
+
+        // 保存数据到云端 (使用 upsert，存在则更新，不存在则插入)
+        async function saveToCloud(month, content) {
+            const { error } = await db.from('work_board_2024').upsert({ 
+                month: month, 
+                content: content, 
+                updated_at: new Date().toISOString() 
+            });
+            if (error) console.error('保存失败:', error);
+        }
+
+        function saveAndClose() {
+            if (currentEditMonth === null) return;
+            const content = document.getElementById('modalContent').value;
+            saveToCloud(currentEditMonth, content);
+            showToast('✅ 保存成功，已同步给所有人！');
+            closeModal();
+        }
+
+        // 优化：加入防抖 (Debounce)，停止打字 0.8 秒后才同步，避免频繁请求
+        document.getElementById('modalContent').addEventListener('input', function() {
+            if (currentEditMonth === null) return;
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                saveToCloud(currentEditMonth, this.value);
+                showSaveHint();
+            }, 800); 
+        });
+
+        function showSaveHint() {
+            const hint = document.getElementById('saveHint');
+            hint.classList.add('show');
+            clearTimeout(window.hintTimer);
+            window.hintTimer = setTimeout(() => hint.classList.remove('show'), 2000);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>
